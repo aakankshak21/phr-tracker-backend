@@ -1,15 +1,15 @@
 const express = require('express');
 const router  = express.Router();
-const { pool } = require('../db');
+const { query } = require('../db');
 
 // ── KPIs ──────────────────────────────────────────────────────────────────────
 router.get('/kpis', async (req, res) => {
   const { start, end } = req.query;
   try {
     const [total, scheduled, log] = await Promise.all([
-      pool.query('SELECT COUNT(*) AS cnt FROM users'),
-      pool.query('SELECT COUNT(*) AS cnt FROM phr_to_be_sent WHERE scheduled_date = CURRENT_DATE'),
-      pool.query(
+      query('SELECT COUNT(*) AS cnt FROM users'),
+      query('SELECT COUNT(*) AS cnt FROM phr_to_be_sent WHERE scheduled_date = CURRENT_DATE'),
+      query(
         `SELECT COUNT(*) AS total,
                 SUM(CASE WHEN status='sent'   THEN 1 ELSE 0 END) AS sent,
                 SUM(CASE WHEN status='failed' THEN 1 ELSE 0 END) AS failed
@@ -33,7 +33,7 @@ router.get('/kpis', async (req, res) => {
 router.get('/status-chart', async (req, res) => {
   const { start, end } = req.query;
   try {
-    const result = await pool.query(
+    const result = await query(
       `SELECT status::text AS status, COUNT(*) AS count
        FROM phr_log WHERE phr_sent_date BETWEEN $1 AND $2
        GROUP BY status::text ORDER BY count DESC`,
@@ -48,7 +48,7 @@ router.get('/status-chart', async (req, res) => {
 // ── Pipeline chart ────────────────────────────────────────────────────────────
 router.get('/pipeline-chart', async (req, res) => {
   try {
-    const result = await pool.query(
+    const result = await query(
       `SELECT COALESCE(pipeline::text,'No Pipeline') AS pipeline, COUNT(*) AS count
        FROM users GROUP BY pipeline::text ORDER BY count DESC`
     );
@@ -62,7 +62,7 @@ router.get('/pipeline-chart', async (req, res) => {
 router.get('/failure-chart', async (req, res) => {
   const { start, end } = req.query;
   try {
-    const result = await pool.query(
+    const result = await query(
       `SELECT COALESCE(failure_reason::text,'Unknown') AS reason, COUNT(*) AS count
        FROM phr_log WHERE status='failed' AND phr_sent_date BETWEEN $1 AND $2
        GROUP BY failure_reason::text ORDER BY count DESC`,
@@ -78,7 +78,7 @@ router.get('/failure-chart', async (req, res) => {
 router.get('/users', async (req, res) => {
   const { start } = req.query;
   try {
-    const result = await pool.query(
+    const result = await query(
       `WITH last_log AS (
          SELECT DISTINCT ON (user_id)
            user_id,
@@ -113,7 +113,7 @@ router.get('/users', async (req, res) => {
 // ── Sidebar user list ─────────────────────────────────────────────────────────
 router.get('/users/list', async (req, res) => {
   try {
-    const result = await pool.query(
+    const result = await query(
       `SELECT id, name, COALESCE(pipeline::text,'No Pipeline') AS pipeline
        FROM users ORDER BY name`
     );
@@ -128,7 +128,7 @@ router.get('/users/:id', async (req, res) => {
   const { id } = req.params;
   try {
     const [info, history] = await Promise.all([
-      pool.query(
+      query(
         `SELECT name, phone, email,
                 COALESCE(pipeline::text,'No Pipeline') AS pipeline,
                 mobile_status::text  AS mobile_status,
@@ -137,7 +137,7 @@ router.get('/users/:id', async (req, res) => {
          FROM users WHERE id = $1`,
         [id]
       ),
-      pool.query(
+      query(
         `SELECT phr_sent_date, phr_sent_time,
                 phr_service::text                   AS phr_service,
                 status::text                        AS status,
