@@ -21,7 +21,7 @@ router.get('/kpis', async (req, res) => {
     res.json({
       totalUsers:    parseInt(total.rows[0].cnt),
       scheduledToday: parseInt(scheduled.rows[0].cnt),
-      successRate:   t > 0 ? ((sent / t) * 100).toFixed(1) : null,
+      successRate:   t > 0 ? ((sent / t) * 100).toFixed(1) : '0.0',
       failedMessages: parseInt(failed),
     });
   } catch (err) {
