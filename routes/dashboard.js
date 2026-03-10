@@ -104,6 +104,7 @@ router.get('/users', async (req, res) => {
          u.id,
          u.name,
          COALESCE(u.phone, '—')                          AS phone,
+         COALESCE(u.email, '—')                          AS email,
          COALESCE(u.pipeline::text, 'No Pipeline')        AS pipeline,
          MAX(l.phr_sent_date)                             AS last_phr_sent_date,
          CASE WHEN COUNT(CASE WHEN l.phr_sent_date >= $1 THEN 1 END) > 0
@@ -113,7 +114,7 @@ router.get('/users', async (req, res) => {
        FROM users u
        LEFT JOIN phr_log  l  ON u.id = l.user_id
        LEFT JOIN last_log ll ON u.id = ll.user_id
-       GROUP BY u.id, u.name, u.phone, u.pipeline, ll.last_status, ll.failure_reason
+       GROUP BY u.id, u.name, u.phone, u.email, u.pipeline, ll.last_status, ll.failure_reason
        ORDER BY u.name`,
       [start]
     );
