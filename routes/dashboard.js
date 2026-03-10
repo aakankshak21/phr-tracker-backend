@@ -6,23 +6,36 @@ const { query } = require('../db');
 router.get('/kpis', async (req, res) => {
   const { start, end } = req.query;
   try {
-    const [total, scheduled, log] = await Promise.all([
+    // Calculate previous equivalent period
+    const s = new Date(start), e = new Date(end);
+    const days = Math.round((e - s) / 86400000) + 1;
+    const prevEnd   = new Date(s); prevEnd.setDate(prevEnd.getDate() - 1);
+    const prevStart = new Date(prevEnd); prevStart.setDate(prevStart.getDate() - days + 1);
+    const pStart = prevStart.toISOString().split('T')[0];
+    const pEnd   = prevEnd.toISOString().split('T')[0];
+
+    const logSql = `SELECT COUNT(*) AS total,
+      SUM(CASE WHEN status='sent'   THEN 1 ELSE 0 END) AS sent,
+      SUM(CASE WHEN status='failed' THEN 1 ELSE 0 END) AS failed
+      FROM phr_log WHERE phr_sent_date BETWEEN $1 AND $2`;
+
+    const [total, scheduled, log, prev] = await Promise.all([
       query('SELECT COUNT(*) AS cnt FROM users'),
       query('SELECT COUNT(*) AS cnt FROM phr_to_be_sent WHERE scheduled_date = CURRENT_DATE'),
-      query(
-        `SELECT COUNT(*) AS total,
-                SUM(CASE WHEN status='sent'   THEN 1 ELSE 0 END) AS sent,
-                SUM(CASE WHEN status='failed' THEN 1 ELSE 0 END) AS failed
-         FROM phr_log WHERE phr_sent_date BETWEEN $1 AND $2`,
-        [start, end]
-      ),
+      query(logSql, [start, end]),
+      query(logSql, [pStart, pEnd]),
     ]);
-    const { total: t, sent, failed } = log.rows[0];
+
+    const { total: t,  sent,  failed  } = log.rows[0];
+    const { total: pt, sent: ps, failed: pf } = prev.rows[0];
+
     res.json({
-      totalUsers:    parseInt(total.rows[0].cnt),
-      scheduledToday: parseInt(scheduled.rows[0].cnt),
-      successRate:   t > 0 ? ((sent / t) * 100).toFixed(1) : '0.0',
-      failedMessages: parseInt(failed),
+      totalUsers:          parseInt(total.rows[0].cnt),
+      scheduledToday:      parseInt(scheduled.rows[0].cnt),
+      successRate:         t  > 0 ? ((sent / t)   * 100).toFixed(1) : '0.0',
+      failedMessages:      parseInt(failed),
+      prevSuccessRate:     pt > 0 ? ((ps   / pt)  * 100).toFixed(1) : '0.0',
+      prevFailedMessages:  parseInt(pf),
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
